@@ -456,7 +456,7 @@
 
     <script>
       const SCRIPT_URL =
-        "https://script.google.com/macros/s/AKfycbymw_bSx5Ltn2RDRC6qntmlJnFADPEFRad7JhC7SyivkSfRNP7A5_7iXfKN1TGGilOi/exec";
+        "https://script.google.com/macros/s/AKfycbzensjuYIezDvEjzsLYakRfZpa2SNAahZoOUlkeGGVMhNSQvPccnUASDBKRo3BnHspV/exec";
 
       function loadForm() {
         // Llamamos a la URL con un parámetro para que el script sepa que queremos los datos
@@ -539,7 +539,6 @@
         }
 
         const selections = [];
-        // Importante: Cambié 'radio' por 'checkbox' para que coincida con tu cambio anterior
         const checkedInputs = document.querySelectorAll(
           'input[type="checkbox"]:checked',
         );
@@ -560,29 +559,38 @@
 
         fetch(SCRIPT_URL, {
           method: "POST",
-          //mode: "no-cors", // Crucial para evitar errores de permisos entre dominios
           cache: "no-cache",
-          // headers: { "Content-Type": "application/json" },
           headers: {
-            "Content-Type": "text/plain;charset=utf-8", // Google prefiere text/plain para evitar el preflight de CORS
+            "Content-Type": "text/plain;charset=utf-8", // Perfecto para evitar problemas de CORS preflight
           },
           body: JSON.stringify({ name, className, childName, selections }),
         })
-          .then(() => {
-            // ÉXITO (withSuccessHandler)
-            let summaryHtml = "<strong>✅ Vous êtes inscrit :</strong><ul>";
-            selections.forEach((sel) => {
-              summaryHtml += `<li><strong>${sel.activity}</strong> – ${sel.timeSlot.replace("-", " à ")}</li>`;
-            });
-            summaryHtml += "</ul>";
+          // 1. Convertimos la respuesta de Google a texto o JSON legible
+          .then((response) => response.json())
+          // 2. Evaluamos la respuesta REAL que devuelve el código del script
+          .then((data) => {
+            if (data.result === "success") {
+              // --- CASO 1: ÉXITO REAL (Se guardó en el Excel y pasó el candado) ---
+              let summaryHtml = "<strong>✅ Vous êtes inscrit :</strong><ul>";
+              selections.forEach((sel) => {
+                summaryHtml += `<li><strong>${sel.activity}</strong> – ${sel.timeSlot.replace("-", " à ")}</li>`;
+              });
+              summaryHtml += "</ul>";
 
-            document.getElementById("summary").innerHTML = summaryHtml;
-            document.getElementById("form-wrapper").style.display = "none";
-            document.getElementById("thank-you").style.display = "block";
+              document.getElementById("summary").innerHTML = summaryHtml;
+              document.getElementById("form-wrapper").style.display = "none";
+              document.getElementById("thank-you").style.display = "block";
+            } else {
+              // --- CASO 2: ERROR CONTROLADO (Por ejemplo: Se acabaron los cupos mientras procesaba) ---
+              // Le mostramos al usuario el mensaje exacto que configuramos en Google ("Désolé...")
+              errorMessage.textContent = data.message;
+              btn.disabled = false;
+              btn.textContent = "Enregistrer";
+            }
           })
           .catch((err) => {
-            // ERROR (withFailureHandler)
-            errorMessage.textContent = "Erreur : " + err.message;
+            // --- CASO 3: ERROR DE RED (Se cayó el internet, URL incorrecta, etc.) ---
+            errorMessage.textContent = "Erreur de connexion : " + err.message;
             btn.disabled = false;
             btn.textContent = "Enregistrer";
           });
